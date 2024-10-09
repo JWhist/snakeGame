@@ -15,7 +15,7 @@ import (
 const (
 	width  = 60 // Width of the game area in segments
 	height = 40 // Height of the game area in segments
-	size   = 10 // Size of each segment (square) in pixels
+	size   = 20 // Size of each segment (square) in pixels
 )
 
 type Point struct {
@@ -26,6 +26,7 @@ type Game struct {
 	head      Point
 	direction Point // Direction in which the snake moves
 	food      []Point
+	rocks     []Point
 	snake     []Point       // List to track snake body segments
 	score     int           // Score counter for food eaten
 	scoreText *canvas.Text  // Text object to display the score
@@ -36,15 +37,16 @@ type Game struct {
 func newGame() *Game {
 	scoreText := canvas.NewText("Score: 0", color.White)
 	scoreText.TextSize = 18
-	scoreText.Move(fyne.NewPos(float32(width*size-80), 10)) // Position the score text
+	scoreText.Move(fyne.NewPos(float32(width*size-100), 10)) // Position the score text
 	return &Game{
-		head:      Point{x: 5, y: 5},     // Starting position of the snake head
-		direction: Point{x: 0, y: 0},     // Initial direction is set to zero
-		food:      generateFood(10),      // Start with 10 food pieces
-		snake:     []Point{{5, 5}},       // Start with the snake's head
-		score:     0,                     // Initial score
-		scoreText: scoreText,             // Initialize the score text
-		speed:     time.Millisecond * 80, // Initial speed
+		head:      Point{x: width / 2, y: height / 2}, // Starting position of the snake head
+		direction: Point{x: 0, y: 0},                  // Initial direction is set to zero
+		food:      generateFood(10),                   // Start with 10 food pieces
+		rocks:     generateRocks(10),                  // Start with 10 rocks
+		snake:     []Point{{5, 5}},                    // Start with the snake's head
+		score:     0,                                  // Initial score
+		scoreText: scoreText,                          // Initialize the score text
+		speed:     time.Millisecond * 80,              // Initial speed
 	}
 }
 
@@ -63,22 +65,48 @@ func generateFood(count int) []Point {
 	return food
 }
 
+// Generate random rock positions
+func generateRocks(count int) []Point {
+	rocks := make([]Point, 0, count)
+	occupied := make(map[Point]bool)
+
+	for len(rocks) < count {
+		newRock := Point{x: rand.Intn(width), y: rand.Intn(height)}
+		if !occupied[newRock] && !occupied[Point{x: 5, y: 5}] { // Ensure it doesn't overlap with the snake's head
+			rocks = append(rocks, newRock)
+			occupied[newRock] = true
+		}
+	}
+	return rocks
+}
+
 func (g *Game) CreateHead() *canvas.Rectangle {
-	headSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 255, B: 255, A: 255}) // White snake head
-	headSquare.Resize(fyne.NewSize(size, size))                                    // Set the size of the head square
-	headSquare.Move(fyne.NewPos(float32(g.head.x*size), float32(g.head.y*size)))   // Position the head square
+	headSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	headSquare.Resize(fyne.NewSize(size, size))
+	headSquare.Move(fyne.NewPos(float32(g.head.x*size), float32(g.head.y*size)))
 	return headSquare
 }
 
-func (g *Game) CreateFood() []*canvas.Rectangle {
-	var foodSquares []*canvas.Rectangle
+func (g *Game) CreateFood() []*canvas.Circle {
+	var foodSquares []*canvas.Circle
 	for _, f := range g.food {
-		foodSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 0, B: 0, A: 255}) // Red food
-		foodSquare.Resize(fyne.NewSize(size, size))                                // Set size
-		foodSquare.Move(fyne.NewPos(float32(f.x*size), float32(f.y*size)))         // Position food square
+		foodSquare := canvas.NewCircle(&color.RGBA{R: 0, G: 255, B: 0, A: 255}) // Red food
+		foodSquare.Resize(fyne.NewSize(size, size))
+		foodSquare.Move(fyne.NewPos(float32(f.x*size), float32(f.y*size)))
 		foodSquares = append(foodSquares, foodSquare)
 	}
 	return foodSquares
+}
+
+func (g *Game) CreateRocks() []*canvas.Rectangle {
+	var rockSquares []*canvas.Rectangle
+	for _, f := range g.rocks {
+		rockSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		rockSquare.Resize(fyne.NewSize(size, size))
+		rockSquare.Move(fyne.NewPos(float32(f.x*size), float32(f.y*size)))
+		rockSquares = append(rockSquares, rockSquare)
+	}
+	return rockSquares
 }
 
 func (g *Game) Update() {
@@ -109,6 +137,7 @@ func (g *Game) Update() {
 				g.food = append(g.food[:i], g.food[i+1:]...)               // Remove food from the list
 				g.snake = append(g.snake, Point{x: g.head.x, y: g.head.y}) // Add a new segment at the end
 				g.food = append(g.food, generateFood(1)[0])                // Add a new piece of food
+				g.rocks = append(g.rocks, generateRocks(1)[0])             // Add a new rock
 				g.score++                                                  // Increment the score
 				g.scoreText.Text = "Score: " + strconv.Itoa(g.score)       // Update the score text
 				g.scoreText.Refresh()                                      // Refresh the score text
@@ -117,6 +146,14 @@ func (g *Game) Update() {
 				} else {
 					g.speed = time.Millisecond * 20
 				}
+				break
+			}
+		}
+
+		// Check for rock collision
+		for _, f := range g.rocks {
+			if newX == f.x && newY == f.y {
+				g.gameOver = true
 				break
 			}
 		}
@@ -139,10 +176,10 @@ func (g *Game) Update() {
 	}
 }
 
-func (g *Game) DrawSnake() []*canvas.Rectangle {
-	var snakeSquares []*canvas.Rectangle
+func (g *Game) DrawSnake() []*canvas.Circle {
+	var snakeSquares []*canvas.Circle
 	for _, segment := range g.snake {
-		snakeSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 255, B: 255, A: 255}) // White snake body
+		snakeSquare := canvas.NewCircle(&color.RGBA{R: 255, G: 255, B: 255, A: 255}) // White snake body
 		snakeSquare.Resize(fyne.NewSize(size, size))
 		snakeSquare.Move(fyne.NewPos(float32(segment.x*size), float32(segment.y*size)))
 		snakeSquares = append(snakeSquares, snakeSquare)
@@ -178,10 +215,11 @@ func (g *Game) GameOverDisplay(w fyne.Window) *fyne.Container {
 
 func (g *Game) Reset() {
 	// Reset the game state
-	g.head = Point{x: 5, y: 5}
+	g.head = Point{x: width / 2, y: height / 2}
 	g.direction = Point{x: 0, y: 0}
 	g.snake = []Point{{5, 5}}
 	g.food = generateFood(10)
+	g.rocks = generateRocks(10)
 	g.score = 0
 	g.speed = 80 * time.Millisecond // Reset speed
 	g.gameOver = false
@@ -212,13 +250,18 @@ func main() {
 		gameContainer.Add(food)
 	}
 
+	// Create rocks
+	rockItems := game.CreateRocks()
+	for _, rock := range rockItems {
+		gameContainer.Add(rock)
+	}
+
 	// Add the score text to the container
 	gameContainer.Add(game.scoreText)
 
 	// Set the content of the window to the game container
 	w.SetContent(gameContainer)
 
-	// Handle key events for arrow keys
 	// Handle key events for arrow keys
 	w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
 		if game.gameOver {
@@ -229,6 +272,9 @@ func main() {
 				foodItems = game.CreateFood() // Generate new food
 				for _, food := range foodItems {
 					gameContainer.Add(food) // Add food to the container
+				}
+				for _, rock := range rockItems {
+					gameContainer.Add(rock)
 				}
 				gameContainer.Add(game.scoreText) // Add the score text to the container
 			}
@@ -273,6 +319,11 @@ func main() {
 			foodItems = game.CreateFood()
 			for _, food := range foodItems {
 				gameContainer.Add(food)
+			}
+
+			rockItems = game.CreateRocks()
+			for _, rock := range rockItems {
+				gameContainer.Add(rock)
 			}
 
 			// Add the score text

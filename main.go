@@ -38,16 +38,17 @@ func newGame() *Game {
 	scoreText := canvas.NewText("Score: 0", color.White)
 	scoreText.TextSize = 18
 	scoreText.Move(fyne.NewPos(float32(width*size-100), 10)) // Position the score text
-	food := generateFood(10)
+	food := generateFood(20)
+
 	return &Game{
 		head:      Point{x: width / 2, y: height / 2}, // Starting position of the snake head
 		direction: Point{x: 0, y: 0},                  // Initial direction is set to zero
-		food:      food,                               // Start with 10 food pieces
-		rocks:     generateRocks(10, food),            // Start with 10 rocks
-		snake:     []Point{{5, 5}},                    // Start with the snake's head
-		score:     0,                                  // Initial score
-		scoreText: scoreText,                          // Initialize the score text
-		speed:     time.Millisecond * 80,              // Initial speed
+		food:      food,
+		rocks:     generateRocks(10, food), // Start with 10 rocks
+		snake:     []Point{{5, 5}},         // Start with the snake's head
+		score:     0,                       // Initial score
+		scoreText: scoreText,               // Initialize the score text
+		speed:     time.Millisecond * 80,   // Initial speed
 	}
 }
 
@@ -96,7 +97,7 @@ func (g *Game) CreateFood() []*canvas.Image {
 	var foodSquares []*canvas.Image
 	for _, f := range g.food {
 		// foodSquare := canvas.NewCircle(&color.RGBA{R: 0, G: 255, B: 0, A: 255}) // Red food
-		foodSquare := canvas.NewImageFromFile("apple.svg")
+		foodSquare := canvas.NewImageFromFile("images/fruits/apple.svg")
 		foodSquare.Resize(fyne.NewSize(size, size))
 		foodSquare.Move(fyne.NewPos(float32(f.x*size), float32(f.y*size)))
 		foodSquares = append(foodSquares, foodSquare)
@@ -108,7 +109,7 @@ func (g *Game) CreateRocks() []*canvas.Image {
 	var rockSquares []*canvas.Image
 	for _, f := range g.rocks {
 		// rockSquare := canvas.NewRectangle(&color.RGBA{R: 255, G: 0, B: 0, A: 255})
-		rockSquare := canvas.NewImageFromFile("rock.svg")
+		rockSquare := canvas.NewImageFromFile("images/rock.svg")
 		rockSquare.Resize(fyne.NewSize(size, size))
 		rockSquare.Move(fyne.NewPos(float32(f.x*size), float32(f.y*size)))
 		rockSquares = append(rockSquares, rockSquare)
@@ -187,7 +188,7 @@ func (g *Game) DrawSnake() []*canvas.Image {
 	var snakeSquares []*canvas.Image
 	for _, segment := range g.snake {
 		// snakeSquare := canvas.NewCircle(&color.RGBA{R: 255, G: 255, B: 255, A: 255}) // White snake body
-		snakeSquare := canvas.NewImageFromFile("bee.svg")
+		snakeSquare := canvas.NewImageFromFile("images/bee.svg")
 		snakeSquare.Resize(fyne.NewSize(size, size))
 		snakeSquare.Move(fyne.NewPos(float32(segment.x*size), float32(segment.y*size)))
 		snakeSquares = append(snakeSquares, snakeSquare)
@@ -311,8 +312,8 @@ func main() {
 	// Game loop to update the snake's position
 	go func() {
 		for {
-			time.Sleep(game.speed) // Control the game update rate
-			game.Update()          // Update the game state
+			start := time.Now()
+			game.Update() // Update the game state
 
 			// Clear the previous drawings
 			gameContainer.Objects = []fyne.CanvasObject{background} // Keep only the background
@@ -344,6 +345,11 @@ func main() {
 
 			// Refresh the container to redraw everything
 			gameContainer.Refresh()
+			elapsed := time.Since(start)
+			sleepTime := game.speed - elapsed
+			if sleepTime > 0 {
+				time.Sleep(sleepTime)
+			}
 		}
 	}()
 

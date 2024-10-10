@@ -1,3 +1,5 @@
+![screenshot](./screenshot.png)
+
 go run main.go
 
 package at your own leisure
